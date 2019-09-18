@@ -63,6 +63,17 @@ func writeFromChan(writer *SafeCSVWriter, c <-chan interface{}) error {
 	return writer.Error()
 }
 
+type headersToOmit map[string]int
+
+func (hto headersToOmit) anyToOmit() bool {
+	for _, value := range hto {
+		if value != -1 {
+			return true
+		}
+	}
+	return false
+}
+
 func writeTo(writer *SafeCSVWriter, in interface{}, omitHeaders bool) error {
 	inValue, inType := getConcreteReflectValueAndType(in) // Get the concrete type (not pointer) (Slice<?> or Array<?>)
 	if err := ensureInType(inType); err != nil {
@@ -74,15 +85,51 @@ func writeTo(writer *SafeCSVWriter, in interface{}, omitHeaders bool) error {
 	}
 	inInnerStructInfo := getStructInfo(inInnerType) // Get the inner struct info to get CSV annotations
 	csvHeadersLabels := make([]string, len(inInnerStructInfo.Fields))
+	csvHeadersLabelsToOmit := make(headersToOmit, len(inInnerStructInfo.Fields))
+
 	for i, fieldInfo := range inInnerStructInfo.Fields { // Used to write the header (first line) in CSV
+		if !fieldInfo.omitEmpty {
+			csvHeadersLabelsToOmit[fieldInfo.getFirstKey()] = -1  // this column will never be omitted because at the end counter will never equal total number of rows
+		} else {
+			csvHeadersLabelsToOmit[fieldInfo.getFirstKey()] = 0
+		}
 		csvHeadersLabels[i] = fieldInfo.getFirstKey()
 	}
+
+	inLen := inValue.Len()
+
+	if csvHeadersLabelsToOmit.anyToOmit() { // if some columns were marked as omitempty
+		// iterate over all results to determine what headers to omit.
+		for i := 0; i < inLen; i++ { // Iterate over container rows
+			for _, fieldInfo := range inInnerStructInfo.Fields {
+				inInnerFieldValue, err := getInnerField(inValue.Index(i), inInnerWasPointer, fieldInfo.IndexChain)
+				if err != nil {
+					return err
+				}
+				if inInnerFieldValue == "" {
+					csvHeadersLabelsToOmit[fieldInfo.getFirstKey()] += 1
+				}
+			}
+		}
+
+		for key, emptyColumns := range csvHeadersLabelsToOmit {
+			if emptyColumns == inLen { // if all rows had this column empty and column was marked to 'omitempty' -> remove the header and corresponding values from the result
+				for i, header := range csvHeadersLabels {
+					if key == header { // remove header
+						csvHeadersLabels = append(csvHeadersLabels[:i], csvHeadersLabels[i+1:]...)
+						inInnerStructInfo.Fields = append(inInnerStructInfo.Fields[:i], inInnerStructInfo.Fields[i+1:]...)
+						break
+					}
+				}
+			}
+		}
+	}
+
 	if !omitHeaders {
 		if err := writer.Write(csvHeadersLabels); err != nil {
 			return err
 		}
 	}
-	inLen := inValue.Len()
 	for i := 0; i < inLen; i++ { // Iterate over container rows
 		for j, fieldInfo := range inInnerStructInfo.Fields {
 			csvHeadersLabels[j] = ""
