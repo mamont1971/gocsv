@@ -123,11 +123,6 @@ func MarshalWithoutHeaders(in interface{}, out io.Writer) (err error) {
 	return writeTo(writer, in, true)
 }
 
-// MarshalChan returns the CSV read from the channel.
-func MarshalChan(c <-chan interface{}, out *SafeCSVWriter) error {
-	return writeFromChan(out, c)
-}
-
 // MarshalCSV returns the CSV in writer from the interface.
 func MarshalCSV(in interface{}, out *SafeCSVWriter) (err error) {
 	return writeTo(out, in, false)
