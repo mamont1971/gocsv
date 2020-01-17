@@ -230,37 +230,6 @@ func Test_writeTo_complex_inner_struct_embed(t *testing.T) {
 	assertLine(t, []string{"true", "email2"}, lines[1])
 }
 
-func Test_writeToChan(t *testing.T) {
-	b := bytes.Buffer{}
-	e := &encoder{out: &b}
-	c := make(chan interface{})
-	sptr := "*string"
-	go func() {
-		for i := 0; i < 100; i++ {
-			v := Sample{Foo: "f", Bar: i, Baz: "baz" + strconv.Itoa(i), Frop: float64(i), Blah: nil, SPtr: &sptr}
-			c <- v
-		}
-		close(c)
-	}()
-	if err := MarshalChan(c, NewSafeCSVWriter(csv.NewWriter(e.out))); err != nil {
-		t.Fatal(err)
-	}
-	lines, err := csv.NewReader(&b).ReadAll()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(lines) != 101 {
-		t.Fatalf("expected 100 lines, got %d", len(lines))
-	}
-	for i, l := range lines {
-		if i == 0 {
-			assertLine(t, []string{"foo", "BAR", "Baz", "Quux", "Blah", "SPtr", "Omit"}, l)
-			continue
-		}
-		assertLine(t, []string{"f", strconv.Itoa(i - 1), "baz" + strconv.Itoa(i-1), strconv.FormatFloat(float64(i-1), 'f', -1, 64), "", "*string", ""}, l)
-	}
-}
-
 // TestRenamedTypes tests for marshaling functions on redefined basic types.
 func TestRenamedTypesMarshal(t *testing.T) {
 	samples := []RenamedSample{
@@ -269,8 +238,9 @@ func TestRenamedTypesMarshal(t *testing.T) {
 	}
 
 	SetCSVWriter(func(out io.Writer) *SafeCSVWriter {
-		csvout := NewSafeCSVWriter(csv.NewWriter(out))
-		csvout.Comma = ';'
+		csvWriter := csv.NewWriter(out)
+		csvWriter.Comma = ';'
+		csvout := NewSafeCSVWriter(csvWriter)
 		return csvout
 	})
 	// Switch back to default for tests executed after this

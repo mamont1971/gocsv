@@ -60,7 +60,7 @@ func writeFromChan(writer *SafeCSVWriter, c <-chan interface{}) error {
 		}
 	}
 	writer.Flush()
-	return writer.Error()
+	return writer.Writer.Error()
 }
 
 type headersToOmit map[string]int
@@ -144,7 +144,7 @@ func writeTo(writer *SafeCSVWriter, in interface{}, omitHeaders bool) error {
 		}
 	}
 	writer.Flush()
-	return writer.Error()
+	return writer.Writer.Error()
 }
 
 func ensureStructOrPtr(t reflect.Type) error {
