@@ -36,15 +36,17 @@ var TagSeparator = ","
 
 var selfCSVWriter = DefaultCSVWriter
 
-// DefaultCSVWriter is the default SafeCSVWriter used to format CSV (cf. csv.NewWriter)
+//DefaultCSVWriter is the default SafeCSVWriter used to format CSV (cf. csv.NewWriter)
 func DefaultCSVWriter(out io.Writer) *SafeCSVWriter {
-	writer := NewSafeCSVWriter(csv.NewWriter(out))
+	csvWriter := csv.NewWriter(out)
 
 	// As only one rune can be defined as a CSV separator, we are going to trim
 	// the custom tag separator and use the first rune.
 	if runes := []rune(strings.TrimSpace(TagSeparator)); len(runes) > 0 {
-		writer.Comma = runes[0]
+		csvWriter.Comma = runes[0]
 	}
+
+	writer := NewSafeCSVWriter(csvWriter)
 
 	return writer
 }
@@ -114,6 +116,12 @@ func MarshalBytes(in interface{}) (out []byte, err error) {
 // Marshal returns the CSV in writer from the interface.
 func Marshal(in interface{}, out io.Writer) (err error) {
 	writer := getCSVWriter(out)
+	return writeTo(writer, in, false)
+}
+
+// A version of Marshal that accepts a CSVWriter as an interface
+func MarshalWithCSVWriter(in interface{}, csvWriter CSVWriter) error {
+	writer := NewSafeCSVWriter(csvWriter)
 	return writeTo(writer, in, false)
 }
 
