@@ -14,7 +14,6 @@ type CSVWriter interface {
 	Error() error
 	Flush()
 	Write(record []string) error
-	WriteAll(records [][]string) error
 }
 
 func NewSafeCSVWriter(original CSVWriter) *SafeCSVWriter {
